@@ -21,6 +21,20 @@ class MerchantService
     public function register(array $data): Merchant
     {
         // TODO: Complete this method
+
+        $user = User::create([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => bcrypt($data['api_key']),
+            'type' => User::MERCHANT_TYPE,
+        ]);
+
+        $merchant = Merchant::create([
+            'user_id' => $user->id,
+            'domain' => $data['domain'],
+        ]);
+
+        return $merchant;
     }
 
     /**
@@ -32,6 +46,16 @@ class MerchantService
     public function updateMerchant(User $user, array $data)
     {
         // TODO: Complete this method
+
+        $user->update([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => bcrypt($data['api_key']),
+        ]);
+
+        $user->merchant->update([
+            'domain' => $data['domain'],
+        ]);
     }
 
     /**
@@ -41,11 +65,19 @@ class MerchantService
      * @param string $email
      * @return Merchant|null
      */
+
     public function findMerchantByEmail(string $email): ?Merchant
     {
         // TODO: Complete this method
-    }
 
+        $user = User::where('email', $email)->first();
+
+        if (!$user) {
+            return null;
+        }
+
+        return $user->merchant;
+    }
     /**
      * Pay out all of an affiliate's orders.
      * Hint: You'll need to dispatch the job for each unpaid order.
@@ -56,5 +88,13 @@ class MerchantService
     public function payout(Affiliate $affiliate)
     {
         // TODO: Complete this method
+
+        $unpaidOrders = Order::where('affiliate_id', $affiliate->id)
+            ->where('paid', false)
+            ->get();
+
+        foreach ($unpaidOrders as $order) {
+            dispatch(new PayoutOrderJob($order));
+        }
     }
 }

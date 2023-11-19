@@ -9,9 +9,12 @@ use App\Models\User;
 
 class OrderService
 {
-    public function __construct(
-        protected AffiliateService $affiliateService
-    ) {}
+    protected $affiliateService;
+
+    public function __construct(AffiliateService $affiliateService)
+    {
+        $this->affiliateService = $affiliateService;
+    }
 
     /**
      * Process an order and log any commissions.
@@ -23,6 +26,32 @@ class OrderService
      */
     public function processOrder(array $data)
     {
-        // TODO: Complete this method
+        $existingOrder = Order::where('order_id', $data['order_id'])->first();
+
+        if ($existingOrder) {
+            return;
+        }
+
+        $merchant = Merchant::firstOrCreate(['domain' => $data['merchant_domain']]);
+        $customer = User::firstOrCreate([
+            'email' => $data['customer_email'],
+            'name' => $data['customer_name'],
+            'type' => User::CUSTOMER_TYPE,
+        ]);
+
+        $affiliate = Affiliate::where('user_id', $customer->id)->first();
+
+        if (!$affiliate) {
+            $affiliate = $this->affiliateService->register($merchant, $customer->email, $customer->name, 0.1);
+        }
+
+        $order = Order::create([
+            'order_id' => $data['order_id'],
+            'subtotal_price' => $data['subtotal_price'],
+            'discount_code' => $data['discount_code'],
+            'merchant_id' => $merchant->id,
+            'affiliate_id' => $affiliate->id,
+        ]);
+        \Log::info('Order processed successfully', ['order_id' => $data['order_id']]);
     }
 }

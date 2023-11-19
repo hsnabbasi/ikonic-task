@@ -12,9 +12,12 @@ use Illuminate\Support\Facades\Mail;
 
 class AffiliateService
 {
-    public function __construct(
-        protected ApiService $apiService
-    ) {}
+    protected $apiService;
+
+    public function __construct(ApiService $apiService)
+    {
+        $this->apiService = $apiService;
+    }
 
     /**
      * Create a new affiliate for the merchant with the given commission rate.
@@ -28,5 +31,26 @@ class AffiliateService
     public function register(Merchant $merchant, string $email, string $name, float $commissionRate): Affiliate
     {
         // TODO: Complete this method
+
+        $user = User::create([
+            'name' => $name,
+            'email' => $email,
+            'password' => bcrypt(str_random(16)),
+            'type' => User::AFFILIATE_TYPE,
+        ]);
+
+        $affiliate = Affiliate::create([
+            'user_id' => $user->id,
+            'merchant_id' => $merchant->id,
+            'commission_rate' => $commissionRate,
+        ]);
+
+        try {
+            Mail::to($email)->send(new AffiliateCreated($affiliate));
+        } catch (\Exception $exception) {
+            throw new AffiliateCreateException('Error sending affiliate creation email');
+        }
+
+        return $affiliate;
     }
 }
